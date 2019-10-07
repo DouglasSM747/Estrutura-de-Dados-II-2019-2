@@ -1,20 +1,76 @@
 #include <bits/stdc++.h>
 #include <stdlib.h>
-
+#define INF 1000000
 using namespace std;
+pair<int, int> InitalPair;
+
+// To represent Disjoint Sets
+struct DisjointSets
+{
+    int *parent, *rnk;
+    int n;
+
+    // Constructor.
+    DisjointSets(int n)
+    {
+        // Allocate memory
+        this->n = n;
+        parent = new int[n + 1];
+        rnk = new int[n + 1];
+
+        // Initially, all vertices are in
+        // different sets and have rank 0.
+        for (int i = 0; i <= n; i++)
+        {
+            rnk[i] = 0;
+
+            //every element is parent of itself
+            parent[i] = i;
+        }
+    }
+
+    // Find the parent of a node 'u'
+    // Path Compression
+    int find(int u)
+    {
+        /* Make the parent of the nodes in the path 
+           from u--> parent[u] point to parent[u] */
+        if (u != parent[u])
+            parent[u] = find(parent[u]);
+        return parent[u];
+    }
+
+    // Union by rank
+    void merge(int x, int y)
+    {
+        x = find(x), y = find(y);
+
+        /* Make tree with smaller height 
+           a subtree of the other tree  */
+        if (rnk[x] > rnk[y])
+            parent[y] = x;
+        else // If rnk[x] <= rnk[y]
+            parent[x] = y;
+
+        if (rnk[x] == rnk[y])
+            rnk[y]++;
+    }
+};
 
 class Grafo
 {
 public:
-    map<int, vector<int>> m; //Cria as vertices
+    map<int, vector<pair<int, int>>> m; //Cria as vertices
     int valor_maximo;
+    bool possuiCicloNegativo = false;
+
     int verificarExisteArresta(int u, int v)
     {
         int existe;
 
         for (auto x : this->m[u])
         {
-            if (v == x)
+            if (v == x.first)
             {
                 return 1;
             }
@@ -42,34 +98,264 @@ public:
 
         for (int i = 0; i <= this->valor_maximo; i++)
             visitado[i] = false; //marca tudo como n visitado
-        
+
         cout << "Visitando Vertice: " << u << endl;
         visitado[u] = true; //marca o vizinho como visitado
 
         while (true)
         {
-            
-            vector<int>::iterator it;
+
+            vector<pair<int, int>>::iterator it;
 
             //Visita todos os vizinhos do U -> Vertice
             for (it = this->m[u].begin(); it != this->m[u].end(); it++)
             {
-                if (!visitado[*it])
+
+                if (!visitado[it->first])
                 {
-                    cout << "Visitando Vertice: " << *it << endl;
-                    visitado[*it] = true; //marca o vizinho como visitado
-                    fila.push(*it); //add na fila
+                    cout << "Visitando Vertice: " << it->first << endl;
+                    visitado[it->first] = true; //marca o vizinho como visitado
+                    fila.push(it->first);       //add na fila
                 }
             }
-            if(!fila.empty()){
+            if (!fila.empty())
+            {
                 u = fila.front();
                 fila.pop();
-            }else{
+            }
+            else
+            {
                 break;
             }
         }
     }
 
+    /* Functions returns weight of the MST*/
+
+    int kruskalMST(vector<pair<int, pair<int, int>>> edges)
+    {
+        int mst_wt = 0; // Initialize result
+
+        // Create disjoint sets
+        DisjointSets ds(this->valor_maximo + 1);
+
+        // Iterate through all sorted edges
+        vector<pair<int, pair<int, int>>>::iterator it;
+        for (it = edges.begin(); it != edges.end(); it++)
+        {
+            if (verificarExisteVertice(it->second.second) == 1)
+            {
+
+                int u = it->second.first;
+                int v = it->second.second;
+
+                int set_u = ds.find(u);
+                int set_v = ds.find(v);
+
+                // Check if the selected edge is creating
+                // a cycle or not (Cycle is created if u
+                // and v belong to same set)
+                if (set_u != set_v)
+                {
+                    // Current edge will be in the MST
+                    // so print it
+                    cout << u << " - " << v << endl;
+
+                    // Update MST weight
+                    mst_wt += it->first;
+
+                    // Merge two sets
+                    ds.merge(set_u, set_v);
+                }
+            }
+        }
+        return mst_wt;
+    }
+
+    void primMST(int src)
+    {
+        // Create a priority queue to store vertices that
+
+        priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
+
+        // Create a vector for keys and initialize all
+        // keys as infinite (INF)
+        vector<int> key(this->valor_maximo, INF);
+
+        // To store parent array which in turn store MST
+        vector<int> parent(this->valor_maximo, -1);
+
+        // To keep track of vertices included in MST
+        vector<bool> inMST(this->valor_maximo, false);
+
+        // Insert source itself in priority queue and initialize
+        // its key as 0.
+        pq.push(make_pair(0, src));
+        key[src] = 0;
+
+        /* Looping till priority queue becomes empty */
+        while (!pq.empty())
+        {
+            // The first vertex in pair is the minimum key
+            // vertex, extract it from priority queue.
+            // vertex label is stored in second of pair (it
+            // has to be done this way to keep the vertices
+            // sorted key (key must be first item
+            // in pair)
+            int u = pq.top().second;
+            pq.pop();
+
+            inMST[u] = true; // Include vertex in MST
+
+            // 'i' is used to get all adjacent vertices of a vertex
+            vector<pair<int, int>>::iterator i;
+            for (i = this->m[u].begin(); i != this->m[u].end(); ++i)
+            {
+                // Get vertex label and weight of current adjacent
+                // of u.
+                int v = i->first;
+                int weight = i->second;
+
+                //  If v is not in MST and weight of (u,v) is smaller
+                // than current key of v
+                if (inMST[v] == false && key[v] > weight)
+                {
+                    // Updating key of v
+                    key[v] = weight;
+                    pq.push(make_pair(key[v], v));
+                    parent[v] = u;
+                }
+            }
+        }
+
+        // Print edges of MST using parent array
+        for (int i = 1; i < this->valor_maximo; ++i)
+            if (verificarExisteVertice(i) == 1)
+                cout << parent[i] << "-" << i << endl;
+    }
+    void BellmanFord(int src)
+    {
+        //define a distancia como infinito
+        int dist[this->valor_maximo];
+
+        for (int i = 0; i < this->valor_maximo; i++)
+        {
+            dist[i] = INF;
+        }
+
+        //a distancia ate si mesmo e' 0
+        dist[src] = 0;
+        vector<pair<int, int>>::iterator it;
+
+        //compara para todas a vezes que pecorreu o grafo (Visualiza novamente)
+        for (int i = 0; i < this->valor_maximo; i++)
+        {
+            //pecorre todos os vertices
+            if (verificarExisteVertice(i) == 1)
+            {
+                for (it = this->m[i].begin(); it != this->m[i].end(); it++)
+                {
+                    int u = i;
+                    int v = it->first;
+                    int peso_arreta = it->second;
+
+                    //RELAXAMENTO
+                    if (dist[v] > (peso_arreta + dist[u]))
+                    {
+                        dist[v] = (dist[u] + peso_arreta);
+                    }
+                }
+            }
+        }
+        //verifica sem alguma arresta sem relaxamento corrento
+        //Se você deseja que o grafo tenha ciclos internos de peso negativo, o algoritmo Bellman Ford não funcionará corretamente.
+        for (int i = 0; i < this->valor_maximo; i++)
+        {
+            if (verificarExisteVertice(i) == 1)
+            {
+                for (it = this->m[i].begin(); it != this->m[i].end(); it++)
+                {
+
+                    int u = i;
+                    int v = it->first;
+                    int peso_arreta = it->second;
+
+                    if (dist[v] > (dist[u] + peso_arreta))
+                    {
+                        this->possuiCicloNegativo = true;
+                    }
+                }
+            }
+        }
+        //Imprime todas las distancias desde el origen hasta todos los vertices.
+        if (!possuiCicloNegativo)
+        {
+            for (int i = 0; i < this->valor_maximo; i++)
+            {
+                if (verificarExisteVertice(i) == 1)
+                    cout << i << " - " << dist[i] << endl;
+            }
+        }
+    }
+    int Dijsk(int u, int v)
+    {
+        int dist[this->valor_maximo];
+        bool visitados[this->valor_maximo]; // verificar se foi visitado
+        //definos a fila de prioridade pela distancia minima ate outro vertice
+        priority_queue<pair<int, int>, vector<pair<int, int>>,
+                       greater<pair<int, int>>>
+            pq; //armazena a distancia e vertice, utiliza fila de prioridade
+
+        //iniciar visitado e dist
+
+        for (int i = 0; i < this->valor_maximo; i++)
+        {
+            dist[i] = INF;
+            visitados[i] = false;
+        }
+
+        //verifica a dist de orgiem para origem e 0
+        dist[u] = 0;
+
+        //insere na fila
+        pq.push(make_pair(dist[u], u));
+
+        while (!pq.empty())
+        {
+            //quem vai expandir (primeiro da pq)
+            pair<int, int> p = pq.top();
+            int vert = p.second; //obtem o vertice do pair que esta sendo analisado
+            pq.pop();
+
+            //verifica se foi expandido
+
+            if (visitados[vert] == false)
+            {
+                visitados[vert] == true;
+
+                vector<pair<int, int>>::iterator it;
+
+                //pecorre os vertices adj de u
+                for (it = this->m[vert].begin(); it != this->m[vert].end(); it++)
+                {
+                    //obter o vertice adjacente e o custo da arresta - RELAXAMENTO
+                    int vertice = it->first;    // vertice adj
+                    int custo_arr = it->second; // custo da arresta
+
+                    //relaxa U - V
+
+                    if (dist[vertice] > (dist[vert] + custo_arr))
+                    {
+                        //atualiza a distancia ate o v
+                        dist[vertice] = (dist[vert] + custo_arr);
+                        pq.push(make_pair(dist[vertice], vertice));
+                    }
+                }
+            }
+        }
+        //retorna a distancia minima do vertice u ate o x
+        return dist[v];
+    }
     //faz uma dfs a partir da raiz (determinada)
     void DFS(int u)
     {
@@ -87,7 +373,7 @@ public:
 
         while (true)
         {
-            vector<int>::iterator it;
+            vector<pair<int, int>>::iterator it;
 
             if (!visitado[u])
             {
@@ -100,7 +386,7 @@ public:
             //busca por vizinho nao visitado
             for (it = this->m[u].begin(); it != this->m[u].end(); it++)
             {
-                if (!visitado[*it])
+                if (!visitado[it->first])
                 {
                     achou = true;
                     break;
@@ -108,7 +394,7 @@ public:
             }
             if (achou)
             {
-                u = *it;
+                u = it->first;
             }
             else //se todos foram visitados ou nao tem vizinho
 
@@ -136,8 +422,10 @@ public:
             if (u > valor_maximo)
                 valor_maximo = u;
 
-            this->m[u].push_back({});                                        //add uma vertice vazia
-            this->m[u].erase(find(this->m[u].begin(), this->m[u].end(), 0)); //remove o elemento vazio adicionado
+            this->m[u].push_back(InitalPair); //add uma vertice vazia
+
+            this->m[u].clear();
+            //this->m[u].erase(find(this->m[u]. begin(), this->m[u].end(), 0)); //remove o elemento vazio adicionado
             return 1;
         }
         else
@@ -150,8 +438,22 @@ public:
     {
         if (verificarExisteVertice(u) == 1 && verificarExisteVertice(u) == 1 && verificarExisteArresta(u, v) == 1)
         {
+            pair<int, int> p;
+
+            for (auto s : this->m[u])
+            {
+                if (s.first == v)
+                {
+                    p.second = s.second;
+                    break;
+                }
+            }
+
+            p.first = v;
+
             //Grafo digrafo, apaga u <-> v
-            this->m[u].erase(find(this->m[u].begin(), this->m[u].end(), v));
+            this->m[u].erase(find(this->m[u].begin(), this->m[u].end(), p));
+
             //this->m[v].erase(find(this->m[v].begin(), this->m[v].end(), u)); //Se quiser transformar em Digrafo
             return 1;
         }
@@ -169,9 +471,9 @@ public:
             {
                 for (int j = 0; j < i.second.size(); j++)
                 {
-                    if (i.second[j] == u)
+                    if (i.second[j].first == u)
                     {
-                        this->m[i.first].erase(find(this->m[i.first].begin(), this->m[i.first].end(), i.second[j]));
+                        this->m[i.first].erase(find(this->m[i.first].begin(), this->m[i.first].end(), make_pair(i.second[j].first, i.second[j].second)));
                     }
                 }
             }
@@ -184,13 +486,13 @@ public:
         }
     }
 
-    int addArresta(int u, int v)
+    int addArresta(int u, int v, int w)
     {
 
         if (verificarExisteVertice(u) == 1 && verificarExisteVertice(v) == 1 && verificarExisteArresta(u, v) == -1)
         {
             //this->m[v].push_back(u); //Se quiser transformar em Digrafo
-            this->m[u].push_back(v);
+            this->m[u].push_back(make_pair(v, w));
             return 1;
         }
         else
@@ -199,7 +501,7 @@ public:
         }
     }
 
-    int obterGrau(int u)
+    int obterGrauSaida(int u)
     {
         bool continuar = false;
 
@@ -213,14 +515,29 @@ public:
         }
     }
 
+    vector<pair<int, pair<int, int>>> OrdenarPesoVetor()
+    {
+        vector<pair<int, pair<int, int>>> edges;
+        for (auto s : this->m)
+        {
+            for (auto x : s.second)
+            {
+                edges.push_back({x.second, {s.first, x.first}});
+            }
+        }
+        sort(edges.begin(), edges.end());
+        return edges;
+    }
+
     void printarGrafo()
     {
         for (auto x : this->m)
         {
-            cout << x.first << ": ";
-            for (int i = 0; i < x.second.size(); i++)
+            cout << "<=== Vertice " << x.first << "=== >" << endl;
+
+            for (auto s : this->m[x.first])
             {
-                cout << x.second[i] << " ";
+                cout << s.first << " > Peso " << s.second << endl;
             }
             cout << endl;
         }
@@ -243,76 +560,84 @@ void listarGrafos(int size)
     }
 }
 
-int AntesMenu()
-{
-    system("clear");
-    int op;
-    cout << "-------BEM VINDO AO SISTEMA DE GRAFOS--------" << endl;
-    cout << "-->Criar Grafo (1)" << endl;
-    cout << "-->Acessar Grafo (2)" << endl;
-    cout << "-->ListarGrafos (3)" << endl;
-    cout << "-->Sair do Sistema (4)" << endl;
+// int AntesMenu()
+// {
+//     system("clear");
+//     int op;
+//     cout << "-------BEM VINDO AO SISTEMA DE GRAFOS--------" << endl;
+//     cout << "-->Criar Grafo (1)" << endl;
+//     cout << "-->Acessar Grafo (2)" << endl;
+//     cout << "-->ListarGrafos (3)" << endl;
+//     cout << "-->Sair do Sistema (4)" << endl;
 
-    cin >> op;
-    return op;
-}
+//     cin >> op;
+//     return op;
+// }
 
-int acessoGrafo(int n_grafo, int size)
-{
-    system("clear");
-    if (n_grafo > size)
-    {
-        return -1;
-    }
-    else
-    {
-        return n_grafo;
-    }
-}
+// int acessoGrafo(int n_grafo, int size)
+// {
+//     system("clear");
+//     if (n_grafo > size)
+//     {
+//         return -1;
+//     }
+//     else
+//     {
+//         return n_grafo;
+//     }
+// }
 
-int menu()
-{
-    int op = 0;
-    cout << "---------------" << endl;
-    cout << "-->Que operacao deseja realizar ?" << endl;
-    cout << "-->Adicionar vertice (1)" << endl;
-    cout << "-->Adicionar arresta (2)" << endl;
-    cout << "-->Remover vertice (3)" << endl;
-    cout << "-->Remover arresta (4)" << endl;
-    cout << "-->Obter Grau do vertice (5)" << endl;
-    cout << "-->Printar Grafo (6)" << endl;
-    cout << "-->Voltar antes Menu (7)" << endl;
+// int menu()
+// {
+//     int op = 0;
+//     cout << "---------------" << endl;
+//     cout << "-->Que operacao deseja realizar ?" << endl;
+//     cout << "-->Adicionar vertice (1)" << endl;
+//     cout << "-->Adicionar arresta (2)" << endl;
+//     cout << "-->Remover vertice (3)" << endl;
+//     cout << "-->Remover arresta (4)" << endl;
+//     cout << "-->Obter Grau do vertice (5)" << endl;
+//     cout << "-->Printar Grafo (6)" << endl;
+//     cout << "-->Voltar antes Menu (7)" << endl;
 
-    cout << "\n Digite a opcao: ";
-    cin >> op;
-    system("clear");
-    return op;
-}
+//     cout << "\n Digite a opcao: ";
+//     cin >> op;
+//     system("clear");
+//     return op;
+// }
 int main()
 {
     int op = 1, v, v1, v2, cont_grafo, grafo;
     vector<Grafo> vg;
     Grafo g;
-    vg.push_back(g);
+    g.addVertice(0);
+    g.addVertice(1);
+    g.addVertice(2);
+    g.addVertice(3);
+    g.addVertice(4);
+    g.addVertice(5);
+    g.addVertice(6);
+    g.addVertice(7);
+    g.addVertice(8);
 
-    vg[0].addVertice(11);
-    vg[0].addVertice(12);
-    vg[0].addVertice(13);
-    vg[0].addVertice(5);
-    vg[0].addVertice(7);
-    vg[0].addVertice(2);
-    vg[0].addVertice(4);
-    vg[0].addVertice(16);
+    g.addArresta(0, 1, 4);
+    g.addArresta(0, 7, 8);
+    g.addArresta(1, 2, 8);
+    g.addArresta(1, 7, 11);
+    g.addArresta(2, 3, 7);
+    g.addArresta(2, 8, 2);
+    g.addArresta(2, 5, 4);
+    g.addArresta(3, 4, 9);
+    g.addArresta(3, 5, 14);
+    g.addArresta(4, 5, 10);
+    g.addArresta(5, 6, 2);
+    g.addArresta(6, 7, 1);
+    g.addArresta(6, 8, 6);
+    g.addArresta(7, 8, 7);
 
-    vg[0].addArresta(11, 12);
-    vg[0].addArresta(11, 7);
-    vg[0].addArresta(12, 13);
-    vg[0].addArresta(12, 5);
-    vg[0].addArresta(7, 2);
-    vg[0].addArresta(7, 4);
-    vg[0].addArresta(4, 16);
-    //vg[0].printarGrafo();
-    vg[0].BFS(11);
+    int k = g.kruskalMST(g.OrdenarPesoVetor());
+    cout << k << endl;
+
     // while (op >= 1 && op <= 3)
     // {
 
